@@ -1,0 +1,42 @@
+version: '3'
+services:
+  app:
+    build:
+      context: .
+    env_file:
+      - .env
+    command: gunicorn app.main:app --bind 0.0.0.0:8000 -w 2 -k uvicorn.workers.UvicornWorker
+    depends_on:
+      - redis
+    ports:
+      - "8000:8000"
+
+  locust:
+    build:
+      context: .
+    env_file:
+      - .env
+    command: locust -f=app/locustfile.py --host=http://app:8000
+    depends_on:
+      - app
+    ports:
+      - "8089:8089"
+
+  redis:
+    image: 'redis:7.0.4'
+    restart: always
+    ports:
+      - '6379:6379'
+
+  clusterf-proxy:
+    image: andymacdonald/clusterf-chaos-proxy
+    environment:
+      JAVA_OPTS: "-Dchaos.strategy=RANDOM_HAVOC -Ddestination.hostProtocolAndPort=http://database:3100 -Dchaos.strategy.delayResponse.random.maxSeconds=10"
+    ports:
+      - "8088:8080"
+
+  database:
+    image: mitchallen/random-server
+    expose:
+      - 3100
+
